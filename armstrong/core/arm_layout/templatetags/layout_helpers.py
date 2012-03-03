@@ -1,8 +1,5 @@
-from contextlib import contextmanager
-import copy
 from django import template
-from django.template import RequestContext
-from django.template.base import TemplateSyntaxError, VariableDoesNotExist
+from django.template.base import TemplateSyntaxError
 
 from ..utils import render_model
 
@@ -17,8 +14,7 @@ class RenderObjectNode(template.Node):
     def render(self, context):
         name = self.name.resolve(context)
         object = self.object.resolve(context)
-        return render_model(object, name, dictionary={},
-            context_instance=context)
+        return render_model(context, object, name)
 
 
 @register.tag(name="render_model")
@@ -40,10 +36,7 @@ class RenderListNode(template.Node):
     def render(self, context):
         name = self.name.resolve(context)
         obj_list = self.obj_list.resolve(context)
-        return ''.join(render_model(obj,
-                                    name,
-                                    dictionary={},
-                                    context_instance=context)
+        return ''.join(render_model(context, obj, name)
                             for obj in obj_list)
 
 
@@ -60,20 +53,16 @@ def do_render_list(parser, token):
 
 
 class RenderIterNode(template.Node):
-    childnodelist = ('nodelist_contents', )
     def __init__(self, obj_list, nodelist_contents):
         self.obj_list = obj_list
         self.nodelist_contents = nodelist_contents
 
     def render(self, context):
-        if 'iter' in context:
-            parentiter = context['iter']
-        else:
-            parentiter = {}
+        parentiter = context.get('iter', {})
         context.push()
+
         objs = self.obj_list.resolve(context)
-        iterator = iter(objs)
-        context['iter'] = iterator
+        context['iter'] = iter(objs)
         nodelist = template.NodeList()
         try:
             for node in self.nodelist_contents:
@@ -105,7 +94,7 @@ class RenderNextNode(template.Node):
     def render(self, context):
         name = self.name.resolve(context)
         obj = context['iter'].next()
-        return render_model(obj, name, dictionary={}, context_instance=context)
+        return render_model(context, obj, name)
 
 
 @register.tag
@@ -129,11 +118,7 @@ class RenderRemainderNode(template.Node):
         try:
             while True:
                 obj = context['iter'].next()
-                result.append(render_model(obj,
-                                           name,
-                                           dictionary={},
-                                           context_instance=context)
-                             )
+                result.append(render_model(context, obj, name))
         except StopIteration:
             return ''.join(result)
 
@@ -147,4 +132,3 @@ def render_remainder(parser, token):
 
     message = "Too %s parameters" % ("many" if len(tokens) > 2 else "few")
     raise TemplateSyntaxError(message)
-
