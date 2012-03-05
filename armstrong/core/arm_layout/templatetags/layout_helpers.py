@@ -1,8 +1,5 @@
-from contextlib import contextmanager
-import copy
 from django import template
-from django.template import RequestContext
-from django.template.base import TemplateSyntaxError, VariableDoesNotExist
+from django.template.base import TemplateSyntaxError
 
 from ..utils import render_model
 
@@ -147,4 +144,3 @@ def render_remainder(parser, token):
 
     message = "Too %s parameters" % ("many" if len(tokens) > 2 else "few")
     raise TemplateSyntaxError(message)
-
