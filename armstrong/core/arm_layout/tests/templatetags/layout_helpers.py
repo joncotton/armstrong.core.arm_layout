@@ -9,14 +9,12 @@ from django.template import (Template, Context, RequestContext,
                              TemplateSyntaxError, VariableDoesNotExist)
 from django.test.client import RequestFactory
 
-from armstrong.dev.tests.utils.base import ArmstrongTestCase
-
 from ...templatetags import layout_helpers
 from ... import utils
-from .._utils import generate_random_model
+from .._utils import generate_random_model, TestCase
 
 
-class RenderObjectNodeTestCase(ArmstrongTestCase):
+class RenderObjectNodeTestCase(TestCase):
     def setUp(self):
         super(RenderObjectNodeTestCase, self).setUp()
         self.factory = RequestFactory()
@@ -129,7 +127,7 @@ class RenderObjectNodeTestCase(ArmstrongTestCase):
         self.assertEqual(Variable("object").resolve(context), obj)
 
 
-class render_modelTestCase(ArmstrongTestCase):
+class render_modelTestCase(TestCase):
     def setUp(self):
         self.model = generate_random_model()
         self.string = """
@@ -171,7 +169,7 @@ class render_modelTestCase(ArmstrongTestCase):
                 "Title: %s" % self.model.title)
 
 
-class RenderListNodeTestCase(ArmstrongTestCase):
+class RenderListNodeTestCase(TestCase):
 
     @contextmanager
     def stub_render_to_string(self):
@@ -219,7 +217,7 @@ class RenderListNodeTestCase(ArmstrongTestCase):
         fudge.verify()
 
 
-class render_listTestCase(ArmstrongTestCase):
+class render_listTestCase(TestCase):
 
     def test_filters_list_argument(self):
         string = """
@@ -237,7 +235,7 @@ class render_listTestCase(ArmstrongTestCase):
         self.assertFalse(re.search('Title: %s' % model_list[3].title, rendered))
 
 
-class RenderIterNodeTestCase(ArmstrongTestCase):
+class RenderIterNodeTestCase(TestCase):
     def test_render_empty_block(self):
         node = layout_helpers.RenderIterNode(Variable('list'), NodeList())
         rendered = node.render(Context({'list': []}))

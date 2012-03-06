@@ -1,12 +1,11 @@
 import random
 
-from armstrong.dev.tests.utils.base import ArmstrongTestCase
-
 from .arm_layout_support.models import Foobar, SubFoobar
 from ..utils import get_layout_template_name
+from ._utils import TestCase
 
 
-class get_layout_template_nameTestCase(ArmstrongTestCase):
+class get_layout_template_nameTestCase(TestCase):
     def setUp(self):
         super(get_layout_template_nameTestCase, self).setUp()
         self.m = Foobar()

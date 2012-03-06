@@ -1,6 +1,12 @@
 import random
 
+from armstrong.dev.tests.utils.base import ArmstrongTestCase
+
 from .arm_layout_support.models import Foobar
+
+
+class TestCase(ArmstrongTestCase):
+    pass
 
 
 def generate_random_model():
