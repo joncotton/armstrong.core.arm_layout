@@ -9,29 +9,37 @@ from django.template import (Template, Context, RequestContext,
                              TemplateSyntaxError, VariableDoesNotExist)
 from django.test.client import RequestFactory
 
+from ..arm_layout_support.models import Foobar
 from ...templatetags import layout_helpers
 from ... import utils
-from .._utils import generate_random_model, TestCase
+from .._utils import TestCase
+
+
+def generate_random_model():
+    random_title = "This is a random title %d" % random.randint(1000, 2000)
+    return Foobar(title=random_title)
+
+
+@contextmanager
+def stub_render_to_string():
+    render_to_string = fudge.Fake().is_callable().returns("")
+    with fudge.patched_context(utils, "render_to_string",
+            render_to_string):
+        yield
+
+
+@contextmanager
+def stub_get_layout_template_name():
+    get_layout_template_name = fudge.Fake().is_callable().returns("")
+    with fudge.patched_context(utils, "get_layout_template_name",
+         get_layout_template_name):
+        yield
 
 
 class RenderObjectNodeTestCase(TestCase):
     def setUp(self):
         super(RenderObjectNodeTestCase, self).setUp()
         self.factory = RequestFactory()
-
-    @contextmanager
-    def stub_render_to_string(self):
-        render_to_string = fudge.Fake().is_callable().returns("")
-        with fudge.patched_context(utils, "render_to_string",
-                render_to_string):
-            yield
-
-    @contextmanager
-    def stub_get_layout_template_name(self):
-        get_layout_template_name = fudge.Fake().is_callable().returns("")
-        with fudge.patched_context(utils, "get_layout_template_name",
-             get_layout_template_name):
-            yield
 
     def contains_model(self, model):
         def test(value):
@@ -48,7 +56,7 @@ class RenderObjectNodeTestCase(TestCase):
         fake = fudge.Fake()
         fake.is_callable().with_args(model, random_name).expects_call()
         with fudge.patched_context(utils, "get_layout_template_name", fake):
-            with self.stub_render_to_string():
+            with stub_render_to_string():
                 node.render(Context({"object": model}))
 
         fudge.verify()
@@ -58,7 +66,7 @@ class RenderObjectNodeTestCase(TestCase):
         random_object_name = "foo_%d" % random.randint(100, 200)
         node = layout_helpers.RenderObjectNode(random_object_name,
                 "'full_name'")
-        with self.stub_render_to_string():
+        with stub_render_to_string():
             try:
                 node.render(Context({random_object_name: model}))
             except VariableDoesNotExist:
@@ -92,7 +100,7 @@ class RenderObjectNodeTestCase(TestCase):
     def test_object_is_provided_to_context(self):
         model = generate_random_model()
         context = Context({"object": model})
-        with self.stub_get_layout_template_name():
+        with stub_get_layout_template_name():
             render_to_string = fudge.Fake().is_callable().expects_call()
             render_to_string.with_args(arg.any(),
                     dictionary=self.contains_model(model),
@@ -105,7 +113,7 @@ class RenderObjectNodeTestCase(TestCase):
     def test_can_pull_object_out_of_complex_context(self):
         model = generate_random_model()
         context = Context({"list": [model]})
-        with self.stub_get_layout_template_name():
+        with stub_get_layout_template_name():
             render_to_string = fudge.Fake().is_callable().expects_call()
             render_to_string.with_args(arg.any(),
                     dictionary=self.contains_model(model),
@@ -121,7 +129,7 @@ class RenderObjectNodeTestCase(TestCase):
         context = Context({"object": obj, "list": [model]})
         self.assertEqual(Variable("object").resolve(context), obj,
                 msg="sanity check")
-        with self.stub_render_to_string():
+        with stub_render_to_string():
             node = layout_helpers.RenderObjectNode("list.0", "'foobar'")
             node.render(context)
         self.assertEqual(Variable("object").resolve(context), obj)
@@ -170,20 +178,12 @@ class render_modelTestCase(TestCase):
 
 
 class RenderListNodeTestCase(TestCase):
-
-    @contextmanager
-    def stub_render_to_string(self):
-        render_to_string = fudge.Fake().is_callable().returns("")
-        with fudge.patched_context(utils, "render_to_string",
-                render_to_string):
-            yield
-
     def test_variable_resolution_for_list(self):
         random_list_name = "list_%d" % random.randint(100, 200)
         rln = layout_helpers.RenderListNode(
                     Variable(random_list_name),
                     "'debug'")
-        with self.stub_render_to_string():
+        with stub_render_to_string():
             try:
                 rln.render(Context({random_list_name: [generate_random_model()]}))
             except VariableDoesNotExist:
@@ -195,7 +195,7 @@ class RenderListNodeTestCase(TestCase):
         rln = layout_helpers.RenderListNode(
                     Variable('list'),
                     random_name_name)
-        with self.stub_render_to_string():
+        with stub_render_to_string():
             try:
                 rln.render(Context({'list': [generate_random_model()],
                                     random_name_name: 'debug'}))
@@ -208,7 +208,7 @@ class RenderListNodeTestCase(TestCase):
                     Variable('list'),
                     "'debug'")
         num_models = random.randint(5, 10)
-        with self.stub_render_to_string():
+        with stub_render_to_string():
             try:
                 rln.render(Context({'list': [generate_random_model()
                     for i in range(num_models)]}))
