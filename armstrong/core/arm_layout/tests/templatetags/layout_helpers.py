@@ -155,15 +155,13 @@ class render_modelTestCase(TestCase):
         self.string += "{% render_model object full_page one_to_many %}"
         with self.assertRaises(TemplateSyntaxError) as e:
             self.rendered_template
-        expected = "Too many parameters"
-        self.assertEqual(e.exception.message, expected)
+        self.assertEqual(str(e.exception), "Too many parameters")
 
     def test_raises_intelligent_exception_on_error_too_few_parameters(self):
         self.string += "{% render_model object %}"
         with self.assertRaises(TemplateSyntaxError) as e:
             self.rendered_template
-        expected = "Too few parameters"
-        self.assertEqual(e.exception.message, expected)
+        self.assertEqual(str(e.exception), "Too few parameters")
 
     def test_evaluates_variable_without_quotations(self):
         self.string += '{% render_model object layout_var %}'
