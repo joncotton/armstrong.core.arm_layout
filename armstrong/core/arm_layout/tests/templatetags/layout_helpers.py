@@ -40,6 +40,7 @@ class RenderObjectNodeTestCase(TestCase):
     def setUp(self):
         super(RenderObjectNodeTestCase, self).setUp()
         self.factory = RequestFactory()
+        self.model = generate_random_model()
 
     def contains_model(self, model):
         def test(value):
@@ -49,84 +50,77 @@ class RenderObjectNodeTestCase(TestCase):
         return arg.passes_test(test)
 
     def test_dispatches_to_get_layout_template_name(self):
-        model = generate_random_model()
         random_name = '"%d"' % random.randint(100, 200)
         node = layout_helpers.RenderObjectNode("object", random_name)
 
         fake = fudge.Fake()
-        fake.is_callable().with_args(model, random_name).expects_call()
+        fake.is_callable().with_args(self.model, random_name).expects_call()
         with fudge.patched_context(utils, "get_layout_template_name", fake):
             with stub_render_to_string():
-                node.render(Context({"object": model}))
+                node.render(Context({"object": self.model}))
 
         fudge.verify()
 
     def test_uses_the_name_provided_to_init_to_lookup_model(self):
-        model = generate_random_model()
         random_object_name = "foo_%d" % random.randint(100, 200)
         node = layout_helpers.RenderObjectNode(random_object_name,
                 "'full_name'")
         with stub_render_to_string():
             try:
-                node.render(Context({random_object_name: model}))
+                node.render(Context({random_object_name: self.model}))
             except VariableDoesNotExist:
                 self.fail("should have found variable in context")
 
     def test_passes_request_into_context_if_available(self):
-        model = generate_random_model()
         request = self.factory.get("/")
         node = layout_helpers.RenderObjectNode("object", "'show_request'")
-        result = node.render(Context({"request": request, "object": model}))
+        result = node.render(Context({"request": request, "object": self.model}))
 
         self.assertRegexpMatches(result, "WSGIRequest")
 
     def test_does_not_use_RequestContext_by_default(self):
-        model = generate_random_model()
         node = layout_helpers.RenderObjectNode("object", "'debug'")
         with self.settings(DEBUG=False):
-            result = node.render(Context({"object": model}))
+            result = node.render(Context({"object": self.model}))
             self.assertEqual(result.strip(), "debug: off")
 
     def test_uses_RequestContext_if_request_provided(self):
-        model = generate_random_model()
         request = self.factory.get("/")
         node = layout_helpers.RenderObjectNode("object", "'debug'")
 
         with self.settings(DEBUG=True):
-            context = RequestContext(request, {"object": model})
+            context = RequestContext(request, {"object": self.model})
             result = node.render(context)
             self.assertEqual(result.strip(), "debug: on")
 
     def test_object_is_provided_to_context(self):
-        model = generate_random_model()
-        context = Context({"object": model})
+        context = Context({"object": self.model})
+
         with stub_get_layout_template_name():
             render_to_string = fudge.Fake().is_callable().expects_call()
-            render_to_string.with_args(arg.any(),
-                    dictionary=self.contains_model(model),
-                    context_instance=context)
-            with fudge.patched_context(utils, "render_to_string",
-                    render_to_string):
-                node = layout_helpers.RenderObjectNode("object", "'foobar'")
+            node = layout_helpers.RenderObjectNode("object", "'foobar'")
+            render_to_string.with_args(
+                arg.any(),
+                dictionary=self.contains_model(self.model),
+                context_instance=context)
+            with fudge.patched_context(utils, "render_to_string", render_to_string):
                 node.render(context)
 
     def test_can_pull_object_out_of_complex_context(self):
-        model = generate_random_model()
-        context = Context({"list": [model]})
+        context = Context({"list": [self.model]})
         with stub_get_layout_template_name():
             render_to_string = fudge.Fake().is_callable().expects_call()
-            render_to_string.with_args(arg.any(),
-                    dictionary=self.contains_model(model),
-                    context_instance=context)
-            with fudge.patched_context(utils, "render_to_string",
-                    render_to_string):
-                node = layout_helpers.RenderObjectNode("list.0", "'foobar'")
+            node = layout_helpers.RenderObjectNode("list.0", "'foobar'")
+            render_to_string.with_args(
+                arg.any(),
+                dictionary=self.contains_model(self.model),
+                context_instance=context)
+            with fudge.patched_context(utils, "render_to_string", render_to_string):
                 node.render(context)
 
     def test_original_context_is_not_contaminated(self):
-        model = generate_random_model()
         obj = object()
-        context = Context({"object": obj, "list": [model]})
+        context = Context({"object": obj, "list": [self.model]})
         self.assertEqual(Variable("object").resolve(context), obj,
                 msg="sanity check")
         with stub_render_to_string():
