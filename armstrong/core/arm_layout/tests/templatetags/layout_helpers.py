@@ -4,13 +4,15 @@ import fudge
 from fudge.inspector import arg
 from contextlib import contextmanager
 
-from django.template import (Template, Context, RequestContext,
-                             NodeList, Variable,
-                             TemplateSyntaxError, VariableDoesNotExist)
+from django.template import (
+    Template, Context, RequestContext, NodeList, Variable,
+    TemplateDoesNotExist, TemplateSyntaxError, VariableDoesNotExist)
 from django.test.client import RequestFactory
 
 from ..arm_layout_support.models import Foobar
-from ...templatetags import layout_helpers
+from ...templatetags.layout_helpers import (
+    RenderObjectNode, RenderListNode, RenderIterNode,
+    RenderNextNode, RenderRemainderNode)
 from ... import utils
 from .._utils import TestCase
 
@@ -51,7 +53,7 @@ class RenderObjectNodeTestCase(TestCase):
 
     def test_dispatches_to_get_layout_template_name(self):
         random_name = '"%d"' % random.randint(100, 200)
-        node = layout_helpers.RenderObjectNode("object", random_name)
+        node = RenderObjectNode("object", random_name)
 
         fake = fudge.Fake()
         fake.is_callable().with_args(self.model, random_name).expects_call()
@@ -63,8 +65,8 @@ class RenderObjectNodeTestCase(TestCase):
 
     def test_uses_the_name_provided_to_init_to_lookup_model(self):
         random_object_name = "foo_%d" % random.randint(100, 200)
-        node = layout_helpers.RenderObjectNode(random_object_name,
-                "'full_name'")
+        node = RenderObjectNode(random_object_name, "'full_name'")
+
         with stub_render_to_string():
             try:
                 node.render(Context({random_object_name: self.model}))
@@ -73,20 +75,20 @@ class RenderObjectNodeTestCase(TestCase):
 
     def test_passes_request_into_context_if_available(self):
         request = self.factory.get("/")
-        node = layout_helpers.RenderObjectNode("object", "'show_request'")
+        node = RenderObjectNode("object", "'show_request'")
         result = node.render(Context({"request": request, "object": self.model}))
 
         self.assertRegexpMatches(result, "WSGIRequest")
 
     def test_does_not_use_RequestContext_by_default(self):
-        node = layout_helpers.RenderObjectNode("object", "'debug'")
+        node = RenderObjectNode("object", "'debug'")
         with self.settings(DEBUG=False):
             result = node.render(Context({"object": self.model}))
             self.assertEqual(result.strip(), "debug: off")
 
     def test_uses_RequestContext_if_request_provided(self):
         request = self.factory.get("/")
-        node = layout_helpers.RenderObjectNode("object", "'debug'")
+        node = RenderObjectNode("object", "'debug'")
 
         with self.settings(DEBUG=True):
             context = RequestContext(request, {"object": self.model})
@@ -98,7 +100,7 @@ class RenderObjectNodeTestCase(TestCase):
 
         with stub_get_layout_template_name():
             render_to_string = fudge.Fake().is_callable().expects_call()
-            node = layout_helpers.RenderObjectNode("object", "'foobar'")
+            node = RenderObjectNode("object", "'foobar'")
             render_to_string.with_args(
                 arg.any(),
                 dictionary=self.contains_model(self.model),
@@ -110,7 +112,7 @@ class RenderObjectNodeTestCase(TestCase):
         context = Context({"list": [self.model]})
         with stub_get_layout_template_name():
             render_to_string = fudge.Fake().is_callable().expects_call()
-            node = layout_helpers.RenderObjectNode("list.0", "'foobar'")
+            node = RenderObjectNode("list.0", "'foobar'")
             render_to_string.with_args(
                 arg.any(),
                 dictionary=self.contains_model(self.model),
@@ -124,7 +126,7 @@ class RenderObjectNodeTestCase(TestCase):
         self.assertEqual(Variable("object").resolve(context), obj,
                 msg="sanity check")
         with stub_render_to_string():
-            node = layout_helpers.RenderObjectNode("list.0", "'foobar'")
+            node = RenderObjectNode("list.0", "'foobar'")
             node.render(context)
         self.assertEqual(Variable("object").resolve(context), obj)
 
@@ -170,9 +172,7 @@ class render_modelTestCase(TestCase):
 class RenderListNodeTestCase(TestCase):
     def test_variable_resolution_for_list(self):
         random_list_name = "list_%d" % random.randint(100, 200)
-        rln = layout_helpers.RenderListNode(
-                    Variable(random_list_name),
-                    "'debug'")
+        rln = RenderListNode(Variable(random_list_name), "'debug'")
         with stub_render_to_string():
             try:
                 rln.render(Context({random_list_name: [generate_random_model()]}))
@@ -182,9 +182,7 @@ class RenderListNodeTestCase(TestCase):
 
     def test_variable_resolution_for_name(self):
         random_name_name = "name_%d" % random.randint(100, 200)
-        rln = layout_helpers.RenderListNode(
-                    Variable('list'),
-                    random_name_name)
+        rln = RenderListNode(Variable('list'), random_name_name)
         with stub_render_to_string():
             try:
                 rln.render(Context({'list': [generate_random_model()],
@@ -194,9 +192,7 @@ class RenderListNodeTestCase(TestCase):
         fudge.verify()
 
     def test_finds_new_templates_for_each_model(self):
-        rln = layout_helpers.RenderListNode(
-                    Variable('list'),
-                    "'debug'")
+        rln = RenderListNode(Variable('list'), "'debug'")
         num_models = random.randint(5, 10)
         with stub_render_to_string():
             try:
@@ -227,33 +223,33 @@ class render_listTestCase(TestCase):
 
 class RenderIterNodeTestCase(TestCase):
     def test_render_empty_block(self):
-        node = layout_helpers.RenderIterNode(Variable('list'), NodeList())
+        node = RenderIterNode(Variable('list'), NodeList())
         rendered = node.render(Context({'list': []}))
         self.assertEqual("", rendered)
 
     def test_render_non_iterable(self):
         model = generate_random_model()
         nodelist = NodeList()
-        nodelist.append(layout_helpers.RenderNextNode("'full_page'"))
-        node = layout_helpers.RenderIterNode(Variable("list"), nodelist)
+        nodelist.append(RenderNextNode("'full_page'"))
+        node = RenderIterNode(Variable("list"), nodelist)
         with self.assertRaises(TypeError):
             node.render(Context({"list": model}))
 
     def test_render_one_element(self):
         model = generate_random_model()
         nodelist = NodeList()
-        nodelist.append(layout_helpers.RenderNextNode("'full_page'"))
-        node = layout_helpers.RenderIterNode(Variable("list"), nodelist)
+        nodelist.append(RenderNextNode("'full_page'"))
+        node = RenderIterNode(Variable("list"), nodelist)
         rendered = node.render(Context({"list": [model]}))
         self.assertTrue(re.search(model.title, rendered))
 
     def test_render_multiple_elements(self):
         models = [generate_random_model() for i in range(random.randint(5, 8))]
         nodelist = NodeList()
-        nodelist.append(layout_helpers.RenderNextNode("'full_page'"))
-        nodelist.append(layout_helpers.RenderNextNode("'show_request'"))
-        nodelist.append(layout_helpers.RenderNextNode("'full_page'"))
-        node = layout_helpers.RenderIterNode(Variable("list"), nodelist)
+        nodelist.append(RenderNextNode("'full_page'"))
+        nodelist.append(RenderNextNode("'show_request'"))
+        nodelist.append(RenderNextNode("'full_page'"))
+        node = RenderIterNode(Variable("list"), nodelist)
         rendered = node.render(Context({"list": models}))
         self.assertTrue(re.search(models[0].title, rendered))
         self.assertFalse(re.search(models[1].title, rendered))
@@ -263,11 +259,11 @@ class RenderIterNodeTestCase(TestCase):
     def test_render_multiple_elements_with_extra_nexts(self):
         models = [generate_random_model() for i in range(2)]
         nodelist = NodeList()
-        nodelist.append(layout_helpers.RenderNextNode("'full_page'"))
-        nodelist.append(layout_helpers.RenderNextNode("'full_page'"))
-        nodelist.append(layout_helpers.RenderNextNode("'show_request'"))
-        nodelist.append(layout_helpers.RenderNextNode("'show_request'"))
-        node = layout_helpers.RenderIterNode(Variable("list"), nodelist)
+        nodelist.append(RenderNextNode("'full_page'"))
+        nodelist.append(RenderNextNode("'full_page'"))
+        nodelist.append(RenderNextNode("'show_request'"))
+        nodelist.append(RenderNextNode("'show_request'"))
+        node = RenderIterNode(Variable("list"), nodelist)
         rendered = node.render(Context({"list": models}))
         self.assertTrue(re.search(models[0].title, rendered))
         self.assertTrue(re.search(models[1].title, rendered))
@@ -276,11 +272,11 @@ class RenderIterNodeTestCase(TestCase):
     def test_render_multiple_elements_with_remainder(self):
         models = [generate_random_model() for i in range(random.randint(5, 8))]
         nodelist = NodeList()
-        nodelist.append(layout_helpers.RenderNextNode("'full_page'"))
-        nodelist.append(layout_helpers.RenderNextNode("'show_request'"))
-        nodelist.append(layout_helpers.RenderNextNode("'full_page'"))
-        nodelist.append(layout_helpers.RenderRemainderNode("'full_page'"))
-        node = layout_helpers.RenderIterNode(Variable("list"), nodelist)
+        nodelist.append(RenderNextNode("'full_page'"))
+        nodelist.append(RenderNextNode("'show_request'"))
+        nodelist.append(RenderNextNode("'full_page'"))
+        nodelist.append(RenderRemainderNode("'full_page'"))
+        node = RenderIterNode(Variable("list"), nodelist)
         rendered = node.render(Context({"list": models}))
         self.assertTrue(re.search(models[0].title, rendered))
         self.assertFalse(re.search(models[1].title, rendered))
