@@ -1,4 +1,5 @@
 import re
+import string
 import random
 import fudge
 from fudge.inspector import arg
@@ -134,39 +135,51 @@ class RenderObjectNodeTestCase(TestCase):
 class render_modelTestCase(TestCase):
     def setUp(self):
         self.model = generate_random_model()
-        self.string = """
-            {% load layout_helpers %}{% render_model object "full_page" %}
-        """.strip()
+        self.string = ""
+        self.tpl_name = "full_page"
+        self.context = Context({"object": self.model})
+        self.expected_result = "Title: %s" % self.model.title
+
+    def make_str(self, str, **kwargs):
+        self.string = string.Template(str).substitute(**kwargs)
 
     @property
     def rendered_template(self):
-        context = Context({"object": self.model})
-        return Template(self.string).render(context)
+        template = "{% load layout_helpers %}" + self.string
+        return Template(template).render(self.context)
 
     def test_dispatches_to_RenderObjectNode(self):
-        self.assertRegexpMatches(self.rendered_template,
-                "Title: %s" % self.model.title)
+        self.make_str('{% render_model object "$tpl" %}', tpl=self.tpl_name)
+        self.assertTrue(self.expected_result in self.rendered_template)
 
-    def test_raises_intelligent_exception_on_error_too_many_parameters(self):
-        self.string += "{% render_model object full_page one_to_many %}"
+    def test_raises_exception_on_too_many_parameters(self):
+        self.make_str('{% render_model object "$tpl" one_too_many %}', tpl=self.tpl_name)
         with self.assertRaisesRegexp(TemplateSyntaxError, "Too many parameters"):
             self.rendered_template
 
-    def test_raises_intelligent_exception_on_error_too_few_parameters(self):
-        self.string += "{% render_model object %}"
+    def test_raises_exception_on_too_few_parameters(self):
+        self.make_str('{% render_model object %}')
         with self.assertRaisesRegexp(TemplateSyntaxError, "Too few parameters"):
             self.rendered_template
 
-    def test_evaluates_variable_without_quotations(self):
-        self.string += '{% render_model object layout_var %}'
-        context = Context({"object": self.model, "layout_var": "full_page"})
-        self.assertRegexpMatches(Template(self.string).render(context),
-                "Title: %s" % self.model.title)
+    def test_evaluates_template_as_context_variable(self):
+        self.make_str('{% render_model object layout_var %}')
+        self.context["layout_var"] = self.tpl_name
+        self.assertTrue(self.expected_result in self.rendered_template)
 
     def test_supports_single_quotes(self):
-        self.string = self.string.replace('"', "'")
-        self.assertRegexpMatches(self.rendered_template,
-                "Title: %s" % self.model.title)
+        self.make_str("{% render_model object '$tpl' %}", tpl=self.tpl_name)
+        self.assertTrue(self.expected_result in self.rendered_template)
+
+    def test_raises_exception_on_missing_template(self):
+        self.make_str('{% render_model object "missing" %}')
+        with self.assertRaises(TemplateDoesNotExist):
+            self.rendered_template
+
+    def test_raises_exception_on_missing_context_variable(self):
+        self.make_str('{% render_model object layout_var %}')
+        with self.assertRaises(VariableDoesNotExist):
+            self.rendered_template
 
 
 class RenderListNodeTestCase(TestCase):
