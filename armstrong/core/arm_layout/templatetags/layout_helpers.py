@@ -55,20 +55,14 @@ def do_render_list(parser, token):
 
 
 class RenderIterNode(template.Node):
-    childnodelist = ('nodelist_contents', )
     def __init__(self, obj_list, nodelist_contents):
         self.obj_list = obj_list
         self.nodelist_contents = nodelist_contents
 
     def render(self, context):
-        if 'iter' in context:
-            parentiter = context['iter']
-        else:
-            parentiter = {}
         context.push()
         objs = self.obj_list.resolve(context)
-        iterator = iter(objs)
-        context['iter'] = iterator
+        context['iter'] = iter(objs)
         nodelist = template.NodeList()
         try:
             for node in self.nodelist_contents:
