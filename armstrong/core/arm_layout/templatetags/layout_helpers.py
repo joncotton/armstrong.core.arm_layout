@@ -14,8 +14,7 @@ class RenderObjectNode(template.Node):
     def render(self, context):
         name = self.name.resolve(context)
         object = self.object.resolve(context)
-        return render_model(object, name, dictionary={},
-            context_instance=context)
+        return render_model(object, name, context_instance=context)
 
 
 @register.tag(name="render_model")
@@ -39,7 +38,6 @@ class RenderListNode(template.Node):
         obj_list = self.obj_list.resolve(context)
         return ''.join(render_model(obj,
                                     name,
-                                    dictionary={},
                                     context_instance=context)
                             for obj in obj_list)
 
@@ -100,9 +98,9 @@ class RenderNextNode(template.Node):
         self.name = template.Variable(name)
 
     def render(self, context):
-        name = self.name.resolve(context)
         obj = context['iter'].next()
-        return render_model(obj, name, dictionary={}, context_instance=context)
+        name = self.name.resolve(context)
+        return render_model(obj, name, context_instance=context)
 
 
 @register.tag
@@ -126,11 +124,8 @@ class RenderRemainderNode(template.Node):
         try:
             while True:
                 obj = context['iter'].next()
-                result.append(render_model(obj,
-                                           name,
-                                           dictionary={},
-                                           context_instance=context)
-                             )
+                result.append(
+                    render_model(obj, name, context_instance=context))
         except StopIteration:
             return ''.join(result)
 
