@@ -1,14 +1,15 @@
 from django.utils.safestring import mark_safe
 from django.template.loader import render_to_string
 
+
 class BasicRenderModelBackend(object):
     def get_layout_template_name(self, model, name):
         ret = []
         for a in model.__class__.mro():
             if not hasattr(a, "_meta"):
                 continue
-            ret.append("layout/%s/%s/%s.html" % (a._meta.app_label,
-                a._meta.object_name.lower(), name))
+            ret.append("layout/%s/%s/%s.html" %
+                (a._meta.app_label, a._meta.module_name, name))
         return ret
 
     def render(self, object, name, dictionary=None,
@@ -21,6 +22,3 @@ class BasicRenderModelBackend(object):
 
     def __call__(self, *args, **kwargs):
         return self.render(*args, **kwargs)
-
-
-

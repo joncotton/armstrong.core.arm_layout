@@ -11,11 +11,11 @@ class get_layout_template_nameTestCase(TestCase):
         self.m = Foobar()
         self.m2 = SubFoobar()
         self.name = "full_page"
-        self._original_object_name = self.m._meta.object_name
+        self._original_module_name = self.m._meta.module_name
         self._original_app_label = self.m._meta.app_label
 
     def tearDown(self):
-        self.m._meta.object_name = self._original_object_name
+        self.m._meta.module_name = self._original_module_name
         self.m._meta.app_label = self._original_app_label
         super(get_layout_template_nameTestCase, self).tearDown()
 
@@ -27,7 +27,7 @@ class get_layout_template_nameTestCase(TestCase):
         result = get_layout_template_name(self.m, self.name)
         expected = 'layout/%s/%s/%s.html' % \
             (self.m._meta.app_label,
-             self.m._meta.object_name.lower(),
+             self.m._meta.module_name,
              self.name)
         self.assertEqual([expected], result)
 
@@ -36,7 +36,7 @@ class get_layout_template_nameTestCase(TestCase):
         result = get_layout_template_name(self.m, file_doesnt_exist)
         expected = 'layout/%s/%s/%s.html' % \
             (self.m._meta.app_label,
-             self.m._meta.object_name.lower(),
+             self.m._meta.module_name,
              file_doesnt_exist)
         self.assertEqual([expected], result)
 
@@ -48,10 +48,10 @@ class get_layout_template_nameTestCase(TestCase):
         self.assertEqual([expected], result)
 
     def test_uses_model_name_in_template_name(self):
-        self.m._meta.object_name = "random_%d" % random.randint(100, 200)
+        self.m._meta.module_name = "random_%d" % random.randint(100, 200)
         result = get_layout_template_name(self.m, self.name)
         expected = 'layout/arm_layout_support/%s/%s.html' % \
-            (self.m._meta.object_name, self.name)
+            (self.m._meta.module_name, self.name)
         self.assertEqual([expected], result)
 
     def test_uses_name_in_template_name(self):
@@ -68,8 +68,8 @@ class get_layout_template_nameTestCase(TestCase):
         """
         result = get_layout_template_name(self.m2, self.name)
         expected_child = 'layout/%s/%s/%s.html' % \
-            (self.m2._meta.app_label, self.m2._meta.object_name.lower(), self.name)
+            (self.m2._meta.app_label, self.m2._meta.module_name, self.name)
         expected_parent = 'layout/%s/%s/%s.html' % \
-            (self.m._meta.app_label, self.m._meta.object_name.lower(), self.name)
+            (self.m._meta.app_label, self.m._meta.module_name, self.name)
 
         self.assertEqual([expected_child, expected_parent], result)
