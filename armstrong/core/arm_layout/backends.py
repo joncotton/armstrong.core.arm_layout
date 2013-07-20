@@ -8,8 +8,14 @@ class BasicRenderModelBackend(object):
         for a in model.__class__.mro():
             if not hasattr(a, "_meta"):
                 continue
+
+            try:
+                model_name = a._meta.model_name
+            except AttributeError:  # DJANGO15 model_name is used in 1.6+
+                model_name = a._meta.module_name
+
             ret.append("layout/%s/%s/%s.html" %
-                (a._meta.app_label, a._meta.module_name, name))
+                (a._meta.app_label, model_name, name))
         return ret
 
     def render(self, object, name, dictionary=None,
